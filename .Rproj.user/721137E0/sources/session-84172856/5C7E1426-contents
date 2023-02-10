@@ -1,0 +1,49 @@
+# Load libraries
+library(data.table)
+library(lubridate)
+
+# read data
+data_cus <- fread("data_customer.csv")
+data_per <- fread("data_personal.csv")
+
+# Prepare data for analysis
+merged_data <- merge(data_cus, data_per, by="CustomerId", all=TRUE)
+merged_data[,Exited:=as.factor(Exited)]
+merged_data[,Exited:=as.factor(Gender)]
+summary(merged_data)
+
+# Predict churn probability
+model_churn <- glm(Exited ~ CreditScore+Gender+Age+Tenure+Balance+NumOfProducts+HasCrCard+IsActiveMember+EstimatedSalary, 
+    data=merged_data, family="binomial")
+predOut <- predict(object = model_churn, newdata = merged_data, type = "response")
+merged_data[,churnProb:=predOut]
+
+merged_data[churnProb==max(churnProb), CustomerId]
+merged_data[churnProb==min(churnProb), CustomerId]
+
+mean(merged_data[Gender=="Male", churnProb])
+mean(merged_data[Gender=="Female", churnProb])
+
+
+# Create a package for churn prediction
+# input the dataset and a customer id 
+# returns the churn probability for that customer id only
+
+churnPred <- function(data, cusID){
+  if (cusID %in% data$CustomerId) {
+    model_churn <- glm(Exited ~ CreditScore+Gender+Age+Tenure+Balance+NumOfProducts+HasCrCard+IsActiveMember+EstimatedSalary, 
+                     data=data, family="binomial")
+    predOut <- predict(object = model_churn, newdata = data, type = "response")
+    data[,churnProb:=predOut]
+    res <- data[CustomerId==cusID, churnProb]
+    return(res)
+  } 
+  else{
+    print("error")
+  }
+}
+
+#churnPred(merged_data, 15735878)
+#churnPred(merged_data, 123)
+merged_data[churnProb==min(churnProb), CustomerId]
+
